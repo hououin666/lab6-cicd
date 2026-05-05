@@ -1,0 +1,8 @@
+"Status","Start Time","Stop Time","Duration in ms","Parent Suite","Suite","Sub Suite","Test Class","Test Method","Name","Description"
+"passed","Tue May 05 16:17:09 UTC 2026","Tue May 05 16:17:10 UTC 2026","1136","tests","test_cart","TestCartCheckout","","","test_successful_checkout_with_promo",""
+"passed","Tue May 05 16:17:08 UTC 2026","Tue May 05 16:17:09 UTC 2026","1176","tests","test_cart","TestCartCheckout","","","test_successful_checkout_without_promo",""
+"passed","Tue May 05 16:17:13 UTC 2026","Tue May 05 16:17:14 UTC 2026","864","tests","test_cart","TestCartCheckout","","","test_data_driven_checkout[1-items_data2-5130]",""
+"passed","Tue May 05 16:17:10 UTC 2026","Tue May 05 16:17:11 UTC 2026","610","tests","test_cart","TestCartCheckout","","","test_empty_cart_error",""
+"passed","Tue May 05 16:17:11 UTC 2026","Tue May 05 16:17:12 UTC 2026","1142","tests","test_cart","TestCartCheckout","","","test_data_driven_checkout[1-items_data0-360]",""
+"passed","Tue May 05 16:17:12 UTC 2026","Tue May 05 16:17:13 UTC 2026","876","tests","test_cart","TestCartCheckout","","","test_data_driven_checkout[2-items_data1-1500]",""
+"skipped","Tue May 05 16:17:11 UTC 2026","Tue May 05 16:17:11 UTC 2026","0","tests","test_cart","TestCartCheckout","","","test_insufficient_balance_error",""
