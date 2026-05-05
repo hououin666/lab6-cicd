@@ -10,7 +10,7 @@ on:
 jobs:
   test:
     name: Run all tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # ← Изменено с ubuntu-latest на ubuntu-22.04
 
     steps:
       - name: Checkout code
@@ -21,12 +21,22 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # НЕ устанавливаем playwright
 
-      - name: Start server
+      - name: Install Playwright browsers
+        run: |
+          playwright install chromium --with-deps
+
+      - name: Start server in background
         run: |
           python app.py &
           echo "SERVER_PID=$!" >> $GITHUB_ENV
@@ -42,9 +52,9 @@ jobs:
           done
           exit 1
 
-      - name: Run backend tests only
+      - name: Run tests
         run: |
-          pytest tests/ -v --tb=short -k "not test_ui"  # пропускаем UI тесты
+          pytest tests/ -v --tb=short
           behave features/ --format pretty
 
       - name: Stop server
@@ -56,4 +66,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: .pytest_cache/
+          path: |
+            test-results/
+            playwright-report/
