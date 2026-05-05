@@ -63,12 +63,27 @@ jobs:
       - name: Run behave BDD tests
         run: behave features/ --format pretty
 
+      - name: Run Playwright UI tests
+        run: pytest tests/ -v --headed=false
+
       - name: Stop server
         if: always()
         run: |
           if [ -n "$SERVER_PID" ]; then
             kill $SERVER_PID 2>/dev/null || true
           fi
+
+      - name: Generate test report
+        if: always()
+        run: |
+          echo "# CI/CD Test Results" > test-report.md
+          echo "" >> test-report.md
+          echo "## Summary" >> test-report.md
+          echo "" >> test-report.md
+          echo "- Run ID: ${{ github.run_id }}" >> test-report.md
+          echo "- Branch: ${{ github.ref_name }}" >> test-report.md
+          echo "- Commit: ${{ github.sha }}" >> test-report.md
+          echo "- Date: $(date)" >> test-report.md
 
       - name: Upload test results
         if: always()
@@ -79,3 +94,32 @@ jobs:
             .pytest_cache/
             test-results/
             playwright-report/
+            test-report.md
+
+      - name: Telegram notification
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+            if [ "${{ job.status }}" = "success" ]; then
+              STATUS="✅ ALL TESTS PASSED"
+              EMOJI="✅"
+            else
+              STATUS="❌ SOME TESTS FAILED"
+              EMOJI="❌"
+            fi
+            
+            MESSAGE="$EMOJI CI/CD Pipeline: $STATUS%0A"
+            MESSAGE="${MESSAGE}Repository: ${{ github.repository }}%0A"
+            MESSAGE="${MESSAGE}Branch: ${{ github.ref_name }}%0A"
+            MESSAGE="${MESSAGE}Commit: ${{ github.sha }}%0A"
+            MESSAGE="${MESSAGE}Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            
+            curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+              -d "chat_id=$TELEGRAM_CHAT_ID" \
+              -d "text=$MESSAGE"
+          else
+            echo "Telegram secrets not configured. Skipping notification."
+          fi
