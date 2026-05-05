@@ -9,102 +9,72 @@ on:
 
 jobs:
   test:
-    name: Run Playwright UI Tests
-    runs-on: ubuntu-22.04
+    name: ${{ matrix.os }} | Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+        python-version: ["3.11", "3.12"]
+      fail-fast: false
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
 
       - name: Cache pip packages
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install pytest pytest-html
           pip install -r requirements.txt
-          playwright install chromium
 
-      - name: Start server in background
+      - name: Install Playwright browsers
+        run: playwright install chromium
+
+      - name: Start server (Unix)
+        if: runner.os != 'Windows'
         run: |
           python app.py &
           echo "SERVER_PID=$!" >> $GITHUB_ENV
 
-      - name: Wait for server to be ready
+      - name: Start server (Windows)
+        if: runner.os == 'Windows'
         run: |
-          echo "Waiting for server to start..."
+          Start-Process -NoNewWindow python app.py
+          Start-Sleep -Seconds 5
+
+      - name: Wait for server
+        run: |
           for i in {1..30}; do
             if curl -s http://localhost:3000/api/status > /dev/null 2>&1; then
               echo "Server is ready!"
               exit 0
             fi
-            echo "Attempt $i/30: Server not ready yet..."
             sleep 1
           done
-          echo "Server failed to start within 30 seconds"
           exit 1
 
       - name: Run Playwright tests
-        run: pytest tests/ -v --tb=short
+        run: pytest tests/ -v --tb=short --html=report.html --self-contained-html
 
-      - name: Stop server
-        if: always()
-        run: |
-          if [ -n "$SERVER_PID" ]; then
-            kill $SERVER_PID 2>/dev/null || true
-          fi
+      - name: Stop server (Unix)
+        if: runner.os != 'Windows' && always()
+        run: kill $SERVER_PID 2>/dev/null || true
 
-      - name: Upload test results
+      - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
-          path: |
-            test-results/
-            playwright-report/
-
-      - name: Telegram notification
-        if: always()
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
-            if [ "${{ job.status }}" = "success" ]; then
-              STATUS="✅ ALL TESTS PASSED"
-              EMOJI="✅"
-            else
-              STATUS="❌ SOME TESTS FAILED"
-              EMOJI="❌"
-            fi
-            
-            MESSAGE="$EMOJI CI/CD Pipeline: $STATUS%0A"
-            MESSAGE="${MESSAGE}Repository: ${{ github.repository }}%0A"
-            MESSAGE="${MESSAGE}Branch: ${{ github.ref_name }}%0A"
-            MESSAGE="${MESSAGE}Commit: ${{ github.sha }}%0A"
-            MESSAGE="${MESSAGE}Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            
-            curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-              -d "chat_id=$TELEGRAM_CHAT_ID" \
-              -d "text=$MESSAGE"
-          else
-            echo "Telegram secrets not configured. Skipping notification."
-          fi
+          name: test-report-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: report.html
