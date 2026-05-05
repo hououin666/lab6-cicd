@@ -68,10 +68,10 @@ jobs:
           path: allure-results/
 
   # ============================================
-  # JOB 2: Генерация и публикация Allure отчета
+  # JOB 2: Генерация Allure отчета (без Docker)
   # ============================================
   allure-report:
-    name: Generate and Publish Allure Report
+    name: Generate Allure Report
     runs-on: ubuntu-22.04
     needs: test
     if: always()
@@ -83,30 +83,36 @@ jobs:
           name: allure-results
           path: allure-results
 
-      - name: List results (debug)
+      - name: Setup Java (требуется для Allure)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Allure CLI
         run: |
-          echo "=== Allure results ==="
-          ls -la allure-results/
-          echo "=== JSON files ==="
-          find allure-results -name "*.json" | head -5
+          curl -Lo allure.tar.gz https://github.com/allure-framework/allure2/releases/download/2.27.0/allure-2.27.0.tgz
+          tar -xzf allure.tar.gz -C /tmp
+          echo "/tmp/allure-2.27.0/bin" >> $GITHUB_PATH
 
       - name: Generate Allure report
-        uses: simple-elf/allure-report-action@v1.7
-        with:
-          allure_results: allure-results
-          allure_report: allure-report
+        run: |
+          allure generate allure-results --clean -o allure-report
+          echo "Allure report generated successfully"
 
-      - name: Upload Allure report as artifact
+      - name: Upload Allure report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: allure-report
-          path: allure-report
+          path: allure-report/
 
       - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
           publish_dir: ./allure-report
           destination_dir: .
-          keep_files: false
+          keep_files: true
